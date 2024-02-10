@@ -27,10 +27,10 @@ runs:
       shell: bash
       run: echo "terraform ${{ inputs.terraform_version }}" > '${{ inputs.path }}/.tool-versions'
 
-    - uses: dan-drew/asdf-actions/tool-versions@ddrew-v1
+    - uses: dan-drew/asdf-actions/tool-versions@v1
       with:
         dir: ${{ inputs.path }}
-    - uses: dan-drew/asdf-actions/install@ddrew-v1
+    - uses: dan-drew/asdf-actions/install@v1
 
     - shell: bash
       run: |
