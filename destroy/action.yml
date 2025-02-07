@@ -1,0 +1,63 @@
+name: Terraform Destroy
+description: Destroy resources in a terraform module
+author: Dan Drew
+
+inputs:
+  path:
+    default: '.'
+    required: false
+    description: 'Path to module to apply. Default is root of the workspace.'
+  terraform_version:
+    default: ''
+    required: false
+    description: 'Provide Terraform version if not using a .tool-versions files.'
+  targets:
+    default: ''
+    required: false
+    description: 'Restrict destroy to selected targets'
+  workspace:
+    default: 'default'
+    required: false
+    description: 'Terraform workspace to apply'
+
+runs:
+  using: composite
+  steps:
+    - if: ${{ inputs.terraform_version != '' }}
+      shell: bash
+      run: echo "terraform ${{ inputs.terraform_version }}" > '${{ inputs.path }}/.tool-versions'
+
+    - uses: dan-drew/asdf-actions/tool-versions@v1
+      with:
+        dir: ${{ inputs.path }}
+    - uses: dan-drew/asdf-actions/install@v1
+
+    - shell: bash
+      run: |
+        set -x
+        readonly target_names='${{ inputs.targets }}'
+        declare -a plan_cmd=("terraform" "plan" "-destroy" "-input=false" "-detailed-exitcode" "-out=tfplan")
+        declare -a apply_cmd=("terraform" "destroy" "-auto-approve" "-input=false" "tfplan")
+
+        for target in $target_names; do
+          plan_cmd+=("-target" "${target}")
+        done
+
+        export TF_IN_AUTOMATION=1
+
+        echo '::group::Initializing'
+        cd '${{ inputs.path }}'
+        terraform init -input=false
+        terraform workspace select ${{ inputs.workspace }}
+        echo '::endgroup::'
+
+        echo '::group::Destroying'
+        if "${plan_cmd[@]}"; then
+          echo '::notice::No changes to destroy'
+        elif [[ "$?" == "2" ]]; then
+          "${apply_cmd[@]}"
+        else
+          echo '::error::Terraform failed trying to generate a plan'
+          exit 1
+        fi
+        echo '::endgroup::'
