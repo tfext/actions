@@ -37,7 +37,7 @@ runs:
         set -x
         readonly target_names='${{ inputs.targets }}'
         declare -a plan_cmd=("terraform" "plan" "-destroy" "-input=false" "-detailed-exitcode" "-out=tfplan")
-        declare -a apply_cmd=("terraform" "-auto-approve" "-input=false" "tfplan")
+        declare -a apply_cmd=("terraform" "apply" "-auto-approve" "-input=false" "tfplan")
 
         for target in $target_names; do
           plan_cmd+=("-target" "${target}")
