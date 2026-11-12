@@ -6,11 +6,11 @@ inputs:
   path:
     default: '.'
     required: false
-    description: 'Path to module to apply. Default is root of the workspace.'
+    description: 'Path to module to apply. Default is root of the workspace. A path with a terragrunt.hcl is applied with Terragrunt.'
   terraform_version:
     default: ''
     required: false
-    description: 'Provide Terraform version if not using a .tool-versions files.'
+    description: 'Provide Terraform version if not using a .tool-versions files. Terragrunt units also need terragrunt in .tool-versions.'
   targets:
     default: ''
     required: false
@@ -36,8 +36,19 @@ runs:
       run: |
         set -x
         readonly target_names='${{ inputs.targets }}'
-        declare -a plan_cmd=("terraform" "plan" "-input=false" "-detailed-exitcode" "-out=tfplan")
-        declare -a apply_cmd=("terraform" "apply" "-auto-approve" "-input=false" "tfplan")
+
+        # A Terragrunt unit has a terragrunt.hcl; anything else is a plain Terraform module
+        declare -a tool=("terraform")
+        if [[ -f '${{ inputs.path }}/terragrunt.hcl' ]]; then
+          tool=("terragrunt" "run" "--")   # Terragrunt 1.x runs Terraform commands through run
+          if ! command -v terragrunt >/dev/null; then
+            echo '::error::${{ inputs.path }} is a Terragrunt unit, but terragrunt is not installed. Add it to .tool-versions'
+            exit 1
+          fi
+        fi
+
+        declare -a plan_cmd=("${tool[@]}" "plan" "-input=false" "-detailed-exitcode" "-out=tfplan")
+        declare -a apply_cmd=("${tool[@]}" "apply" "-auto-approve" "-input=false" "tfplan")
 
         for target in $target_names; do
           plan_cmd+=("-target" "${target}")
@@ -47,8 +58,8 @@ runs:
 
         echo '::group::Initializing'
         cd '${{ inputs.path }}'
-        terraform init -input=false
-        terraform workspace select ${{ inputs.workspace }}
+        "${tool[@]}" init -input=false
+        "${tool[@]}" workspace select ${{ inputs.workspace }}
         echo '::endgroup::'
 
         echo '::group::Applying'
